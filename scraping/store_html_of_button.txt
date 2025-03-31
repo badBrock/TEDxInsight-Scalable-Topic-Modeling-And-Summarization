@@ -1,0 +1,8 @@
+<a id="video-title-link" class="yt-simple-endpoint focus-on-expand style-scope ytd-rich-grid-media" aria-label="How to shift your mindset and choose your future | Tom Rivett-Carnac by TED 138,978 views 4 years ago 15 minutes" title="How to shift your mindset and choose your future | Tom Rivett-Carnac" href="/watch?v=bNmRr-BYnxA"><yt-formatted-string id="video-title" class="style-scope ytd-rich-grid-media">How to shift your mindset and choose your future | Tom Rivett-Carnac</yt-formatted-string></a>
+
+
+//*[@id="video-title-link"]
+
+
+
+
