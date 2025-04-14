@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TED Comment Analyzer</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        --primary-color: #e62b1e;
+        --secondary-color: #333333;
+        --accent-color: #ff8a00;
+        --light-bg: #f9f9f9;
+        --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        --gradient-bg: linear-gradient(135deg, #e62b1e 0%, #ff8a00 100%);
+      }
+
+      body {
+        background-color: #f5f5f5;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      .navbar {
+        background: var(--gradient-bg);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      }
+
+      .navbar-brand {
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+
+      .main-container {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .app-header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+
+      .app-title {
+        font-weight: 700;
+        color: var(--primary-color);
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        margin-bottom: 0.5rem;
+      }
+
+      .app-subtitle {
+        color: var(--secondary-color);
+        font-weight: 400;
+      }
+
+      .input-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        margin-bottom: 2rem;
+        border: none;
+        overflow: hidden;
+      }
+
+      .input-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      }
+
+      .input-card .card-header {
+        background: var(--gradient-bg);
+        color: white;
+        font-weight: 600;
+        border: none;
+        padding: 15px 20px;
+      }
+
+      .input-card .card-body {
+        padding: 25px;
+      }
+
+      .form-control {
+        border-radius: 8px;
+        padding: 10px 15px;
+        border: 1px solid #ddd;
+        transition: all 0.3s ease;
+      }
+
+      .form-control:focus {
+        box-shadow: 0 0 0 3px rgba(230, 43, 30, 0.2);
+        border-color: var(--primary-color);
+      }
+
+      .btn-primary {
+        background: var(--primary-color);
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+      }
+
+      .btn-primary:hover {
+        background: #d02418;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(230, 43, 30, 0.3);
+      }
+
+      #loading {
+        display: none;
+        text-align: center;
+        margin: 2rem 0;
+      }
+
+      .loading-animation {
+        display: inline-block;
+        position: relative;
+        width: 80px;
+        height: 80px;
+      }
+
+      .loading-animation div {
+        position: absolute;
+        top: 33px;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        animation-timing-function: cubic-bezier(0, 1, 1, 0);
+      }
+
+      .loading-animation div:nth-child(1) {
+        left: 8px;
+        animation: loading1 0.6s infinite;
+      }
+
+      .loading-animation div:nth-child(2) {
+        left: 8px;
+        animation: loading2 0.6s infinite;
+      }
+
+      .loading-animation div:nth-child(3) {
+        left: 32px;
+        animation: loading2 0.6s infinite;
+      }
+
+      .loading-animation div:nth-child(4) {
+        left: 56px;
+        animation: loading3 0.6s infinite;
+      }
+
+      @keyframes loading1 {
+        0% {
+          transform: scale(0);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      @keyframes loading2 {
+        0% {
+          transform: translate(0, 0);
+        }
+        100% {
+          transform: translate(24px, 0);
+        }
+      }
+
+      @keyframes loading3 {
+        0% {
+          transform: scale(1);
+        }
+        100% {
+          transform: scale(0);
+        }
+      }
+
+      .results-container {
+        margin-top: 1rem;
+      }
+
+      .topic-card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+
+      .topic-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        border-left-color: var(--accent-color);
+      }
+
+      .topic-card.active {
+        border-left-color: var(--primary-color);
+        background-color: rgba(230, 43, 30, 0.05);
+      }
+
+      .topic-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .topic-name {
+        font-size: 0.9rem;
+        color: #666;
+        font-style: italic;
+      }
+
+      .comment-box {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 3px solid var(--accent-color);
+        transition: all 0.2s ease;
+      }
+
+      .comment-box:hover {
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        transform: translateY(-3px);
+      }
+
+      .details-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+        height: calc(100% - 1rem);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .details-card .card-header {
+        background: var(--gradient-bg);
+        color: white;
+        font-weight: 600;
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .details-card .card-body {
+        padding: 20px;
+        overflow-y: auto;
+        flex: 1;
+      }
+
+      .btn-outline-light {
+        border-color: rgba(255, 255, 255, 0.7);
+        color: white;
+        transition: all 0.3s ease;
+      }
+
+      .btn-outline-light:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: white;
+      }
+
+      .topic-summary {
+        background: rgba(230, 43, 30, 0.08);
+        border-left: 4px solid var(--primary-color);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        position: relative;
+      }
+
+      .comments-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .badge-comment-count {
+        background: var(--accent-color);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+      }
+
+      .video-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 2rem;
+      }
+
+      .video-container {
+        width: 100%;
+        height: 0;
+        padding-bottom: 56.25%; /* 16:9 aspect ratio */
+        position: relative;
+        overflow: hidden;
+        background: #000;
+        display: flex;
+        justify-content: center;
+      }
+
+      .video-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+      .video-info {
+        padding: 15px 20px;
+      }
+
+      .video-title {
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: var(--secondary-color);
+      }
+
+      .video-meta {
+        font-size: 0.9rem;
+        color: #666;
+      }
+
+      /* Animations */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease forwards;
+      }
+
+      /* Pulse animation for active elements */
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(230, 43, 30, 0.7);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(230, 43, 30, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(230, 43, 30, 0);
+        }
+      }
+
+      .pulse {
+        animation: pulse 2s infinite;
+      }
+
+      /* Centered video container */
+      .center-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+      <div class="container">
+        <a class="navbar-brand" href="#">
+          <i class="fas fa-comment-dots me-2"></i>TED Comment Analyzer
+        </a>
+      </div>
+    </nav>
+
+    <div class="main-container">
+      <div class="app-header">
+        <h1 class="app-title">TED Talk Comment Analyzer</h1>
+        <p class="app-subtitle">Discover insights from TED Talk discussions</p>
+      </div>
+
+      <!-- Video ID Input Form -->
+      <div class="row justify-content-center">
+        <div class="col-md-8">
+          <div class="card input-card">
+            <div class="card-header">
+              <i class="fas fa-search me-2"></i>Analyze TED Talk
+            </div>
+            <div class="card-body">
+              <form id="analyzeForm">
+                <div class="mb-3">
+                  <label for="videoId" class="form-label"
+                    >Enter TED Talk Video ID</label
+                  >
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="fas fa-link"></i>
+                    </span>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="videoId"
+                      placeholder="e.g., simon_sinek_how_great_leaders_inspire_action"
+                    />
+                  </div>
+                  <div class="form-text">
+                    Enter the ID from the URL:
+                    https://www.youtube.com/watch?v=[video_id]
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                  <i class="fas fa-analytics me-2"></i>Analyze Comments
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading Indicator -->
+      <div id="loading" class="text-center">
+        <div class="loading-animation">
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+        <p class="mt-3 fw-bold">
+          Analyzing comments, this may take a few minutes...
+        </p>
+      </div>
+
+      <!-- Video Player (Initially Hidden) - CENTERED YOUTUBE PLAYER -->
+      <div
+        class="row justify-content-center"
+        id="videoPlayerSection"
+        style="display: none"
+      >
+        <div class="col-md-10">
+          <div class="video-card animate-fade-in">
+            <div class="center-container">
+              <div class="video-container">
+                <iframe
+                  id="youtubePlayer"
+                  frameborder="0"
+                  allowfullscreen
+                ></iframe>
+              </div>
+            </div>
+            <div class="video-info">
+              <h5 class="video-title" id="videoTitle">TED Talk Title</h5>
+              <p class="video-meta" id="videoMeta">
+                <i class="fas fa-user me-1"></i>
+                <span id="videoSpeaker">Speaker</span>
+                <span class="mx-2">|</span>
+                <i class="fas fa-calendar me-1"></i>
+                <span id="videoDate">Date</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Section with REORDERED LAYOUT -->
+      <div
+        class="row results-container"
+        id="resultsSection"
+        style="display: none"
+      >
+        <div class="col-12">
+          <div class="row">
+            <!-- Topics Column - NOW ABOVE -->
+            <div class="col-md-4 mb-4">
+              <div class="card details-card">
+                <div class="card-header">
+                  <span
+                    ><i class="fas fa-layer-group me-2"></i>Discussion
+                    Topics</span
+                  >
+                </div>
+                <div class="card-body">
+                  <div id="topicsList" class="topics-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Topic Details Column - NOW BELOW -->
+            <div class="col-md-8">
+              <div class="card details-card">
+                <div class="card-header">
+                  <span id="topicTitle"
+                    ><i class="fas fa-comments me-2"></i>Topic Details</span
+                  >
+                  <div>
+                    <button
+                      id="generateNameBtn"
+                      class="btn btn-sm btn-outline-light me-2"
+                      style="display: none"
+                    >
+                      <i class="fas fa-tag me-1"></i>Name Topic
+                    </button>
+                    <button
+                      id="summarizeBtn"
+                      class="btn btn-sm btn-outline-light"
+                      style="display: none"
+                    >
+                      <i class="fas fa-compress-alt me-1"></i>Summarize
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div
+                    id="topicSummary"
+                    class="topic-summary"
+                    style="display: none"
+                  ></div>
+                  <div class="comments-header">
+                    <h6 id="commentsHeader">Select a topic to view comments</h6>
+                    <span
+                      class="badge-comment-count"
+                      id="commentCount"
+                      style="display: none"
+                      >0</span
+                    >
+                  </div>
+                  <div id="commentsList"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const analyzeForm = document.getElementById("analyzeForm");
+        const loading = document.getElementById("loading");
+        const resultsSection = document.getElementById("resultsSection");
+        const topicsList = document.getElementById("topicsList");
+        const commentsList = document.getElementById("commentsList");
+        const topicTitle = document.getElementById("topicTitle");
+        const commentsHeader = document.getElementById("commentsHeader");
+        const generateNameBtn = document.getElementById("generateNameBtn");
+        const summarizeBtn = document.getElementById("summarizeBtn");
+        const topicSummary = document.getElementById("topicSummary");
+        const commentCount = document.getElementById("commentCount");
+        const videoPlayerSection =
+          document.getElementById("videoPlayerSection");
+        const youtubePlayer = document.getElementById("youtubePlayer");
+        const videoTitle = document.getElementById("videoTitle");
+        const videoSpeaker = document.getElementById("videoSpeaker");
+        const videoDate = document.getElementById("videoDate");
+
+        let currentTopicId = null;
+
+        // Handle form submission
+        analyzeForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          const videoId = document.getElementById("videoId").value.trim();
+          if (!videoId) {
+            alert("Please enter a valid video ID");
+            return;
+          }
+
+          // Show loading, hide results
+          loading.style.display = "block";
+          resultsSection.style.display = "none";
+          videoPlayerSection.style.display = "none";
+          topicsList.innerHTML = "";
+          commentsList.innerHTML = "";
+          topicTitle.innerHTML =
+            '<i class="fas fa-comments me-2"></i>Topic Details';
+          commentsHeader.textContent = "Select a topic to view comments";
+          topicSummary.style.display = "none";
+          commentCount.style.display = "none";
+
+          // Setup video player (using YouTube instead of TED embed)
+          setupVideoPlayer(videoId);
+
+          // Send analyze request
+          const formData = new FormData();
+          formData.append("video_id", videoId);
+
+          fetch("/analyze", {
+            method: "POST",
+            body: formData,
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              loading.style.display = "none";
+
+              if (data.error) {
+                alert(data.error);
+                return;
+              }
+
+              videoPlayerSection.style.display = "block";
+              resultsSection.style.display = "flex";
+
+              // Populate topics list
+              if (data.available_topics && data.available_topics.length > 0) {
+                topicsList.innerHTML = "";
+                data.available_topics.forEach((topicId, index) => {
+                  const topicInfo = data.topic_df.find(
+                    (t) => t.Topic === topicId
+                  );
+                  const count = topicInfo ? topicInfo.Count : 0;
+
+                  const topicElement = document.createElement("div");
+                  topicElement.className = "topic-card animate-fade-in";
+                  topicElement.style.animationDelay = `${index * 0.1}s`;
+                  topicElement.dataset.topicId = topicId;
+                  topicElement.innerHTML = `
+                                <div class="topic-header">
+                                    <h6 class="mb-0">Topic ${topicId}</h6>
+                                    <span class="badge bg-secondary">${count}</span>
+                                </div>
+                                <p class="topic-name topic-name-${topicId} mb-0">Click to explore</p>
+                            `;
+
+                  topicsList.appendChild(topicElement);
+                });
+              } else {
+                topicsList.innerHTML =
+                  '<div class="alert alert-warning">No topics found</div>';
+              }
+            })
+            .catch((error) => {
+              loading.style.display = "none";
+              alert("Error analyzing comments: " + error);
+            });
+        });
+
+        // Setup Video Player - MODIFIED TO USE YOUTUBE PLAYER
+        function setupVideoPlayer(videoId) {
+          // Use YouTube embed URL instead of TED embed
+          youtubePlayer.src = `https://www.youtube.com/embed/${videoId}`;
+
+          // Set video details (in real app, you'd fetch these)
+          videoTitle.textContent = formatVideoId(videoId);
+          videoSpeaker.textContent = "TED Speaker";
+          videoDate.textContent = new Date().toLocaleDateString();
+        }
+
+        // Format video ID to make it look like a title
+        function formatVideoId(videoId) {
+          return videoId
+            .replace(/_/g, " ")
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+        }
+
+        // Handle topic selection
+        topicsList.addEventListener("click", function (e) {
+          const topicElement = e.target.closest(".topic-card");
+          if (!topicElement) return;
+
+          // Remove active class from all topics
+          document.querySelectorAll(".topic-card").forEach((item) => {
+            item.classList.remove("active", "pulse");
+          });
+
+          // Add active class to selected topic
+          topicElement.classList.add("active", "pulse");
+
+          const topicId = topicElement.dataset.topicId;
+          currentTopicId = topicId;
+
+          // Update UI
+          topicTitle.innerHTML = `<i class="fas fa-comments me-2"></i>Topic ${topicId} Details`;
+          commentsHeader.textContent = "Loading comments...";
+          commentsList.innerHTML = "";
+          generateNameBtn.style.display = "inline-block";
+          summarizeBtn.style.display = "inline-block";
+          topicSummary.style.display = "none";
+          commentCount.style.display = "none";
+
+          // Fetch comments for this topic
+          fetch(`/get_comments_by_topic/${topicId}`)
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.error) {
+                commentsHeader.textContent = data.error;
+                return;
+              }
+
+              commentsHeader.textContent = `Comments`;
+              commentCount.textContent = data.count;
+              commentCount.style.display = "inline-block";
+              commentsList.innerHTML = "";
+
+              // Display comments with animation delay
+              data.comments.forEach((comment, index) => {
+                const commentBox = document.createElement("div");
+                commentBox.className = "comment-box animate-fade-in";
+                commentBox.style.animationDelay = `${index * 0.1}s`;
+                commentBox.textContent = comment;
+                commentsList.appendChild(commentBox);
+              });
+            })
+            .catch((error) => {
+              commentsHeader.textContent = "Error loading comments";
+              console.error("Error:", error);
+            });
+        });
+
+        // Generate topic name
+        generateNameBtn.addEventListener("click", function () {
+          if (!currentTopicId) return;
+
+          const nameElement = document.querySelector(
+            `.topic-name-${currentTopicId}`
+          );
+          if (nameElement) {
+            nameElement.innerHTML =
+              '<i class="fas fa-spinner fa-spin me-1"></i> Generating...';
+          }
+
+          fetch(`/generate_topic_name/${currentTopicId}`)
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.error) {
+                alert(data.error);
+                return;
+              }
+
+              if (nameElement) {
+                nameElement.innerHTML = `<i class="fas fa-tag me-1"></i> ${data.name}`;
+              }
+            })
+            .catch((error) => {
+              alert("Error generating topic name: " + error);
+            });
+        });
+
+        // Summarize topic
+        summarizeBtn.addEventListener("click", function () {
+          if (!currentTopicId) return;
+
+          topicSummary.innerHTML =
+            '<i class="fas fa-spinner fa-spin me-2"></i> Generating summary...';
+          topicSummary.style.display = "block";
+
+          fetch(`/summarize_topic/${currentTopicId}`)
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.error) {
+                topicSummary.textContent = data.error;
+                return;
+              }
+
+              topicSummary.innerHTML = `
+                            <i class="fas fa-quote-left text-muted me-2"></i>
+                            ${data.summary}
+                        `;
+            })
+            .catch((error) => {
+              topicSummary.textContent = "Error generating summary";
+              console.error("Error:", error);
+            });
+        });
+      });
+    </script>
+  </body>
+</html>
