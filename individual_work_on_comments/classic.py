@@ -1,3 +1,4 @@
+# classic.py
 import os
 import re
 import pickle
@@ -15,7 +16,13 @@ from sklearn.feature_extraction.text import CountVectorizer
 from bertopic.representation import KeyBERTInspired
 from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
-
+import requests
+from tqdm import tqdm
+import nltk
+from nltk.tokenize import sent_tokenize
+import tiktoken  # for token counting
+import concurrent.futures  # for parallel processing
+nltk.download('punkt')
 logger = logging.getLogger(__name__)
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 
@@ -298,3 +305,256 @@ class TEDCommentAnalyzer:
                         print(f"Error parsing topic {topic_id}: {e}")
         
         return topic_keywords
+    
+    def clean_transcript_string(self, transcript):
+    # Remove transcription noise like (Applause), [detained], [many]
+        transcript = re.sub(r'\[.*?\]|\(.*?\)', '', transcript)
+
+        # Normalize punctuation: keep periods, commas, question marks, exclamations
+        transcript = re.sub(r'[^a-zA-Z0-9\s\.\,\?\!]', '', transcript)
+
+        # Normalize multiple spaces to single space
+        transcript = re.sub(r'\s+', ' ', transcript)
+
+        # Convert to lowercase and strip
+        transcript = transcript.lower().strip()
+
+        # Split into sentences based on ., ?, or !
+        sentences = re.split(r'[.?!]', transcript)
+
+        # Clean up empty strings and strip extra whitespace
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        return sentences
+
+    def get_transcript_summary(self, video_id):
+        try:
+            logger.info(f"Getting transcript for video ID: {video_id}")
+            # Find the video in the data
+            video_data = self.data[self.data['video_id'] == video_id]
+            
+            if video_data.empty:
+                logger.error(f"No data found for video ID: {video_id}")
+                return "No transcript found for this video. Please ensure the video ID is correct."
+            
+            # Debug: What columns are available in the data?
+            logger.info(f"Available columns: {video_data.columns.tolist()}")
+            
+            # Get the transcript - check if the column exists first
+            if 'all_comments' not in video_data.columns:
+                logger.error("No 'transcript' column found in data")
+                return "Transcript data is not available in the database schema."
+            
+            transcript = video_data.iloc[0].get("all_comments", None)
+            if transcript is None or transcript == "" or pd.isna(transcript):
+                logger.error("Transcript is empty or None")
+                return "Transcript is not available for this video."
+            
+            logger.info(f"Transcript type: {type(transcript)}")
+            logger.info(f"Transcript preview: {str(transcript)[:100]}...")
+            
+            # Clean and prepare the transcript text
+            if isinstance(transcript, str):
+                try:
+                    # Try to parse if it's stored as a string representation of a list
+                    transcript_data = ast.literal_eval(transcript)
+                    if isinstance(transcript_data, list):
+                        cleaned_text = " ".join([item['text'] for item in transcript_data if isinstance(item, dict) and 'text' in item])
+                    else:
+                        cleaned_text = str(transcript_data)
+                except (ValueError, SyntaxError) as e:
+                    logger.info(f"Using transcript as plain text: {e}")
+                    # If not a valid list representation, use as is
+                    cleaned_text = transcript
+            elif isinstance(transcript, list):
+                cleaned_text = " ".join([item['text'] for item in transcript if isinstance(item, dict) and 'text' in item])
+            else:
+                logger.error(f"Invalid transcript format: {type(transcript)}")
+                return f"Invalid transcript format: {type(transcript)}."
+            
+            # Debug the cleaned text
+            logger.info(f"Cleaned text length: {len(cleaned_text)}")
+            logger.info(f"Cleaned text preview: {cleaned_text[:100]}...")
+            
+            # Process the cleaned text
+            input_data = self.clean_transcript_string(cleaned_text)
+            large_input = " ".join(input_data)
+            
+            logger.info("Calling summarize_large_text...")
+            # Return the summary
+            return self.summarize_large_text(large_input)
+
+        except Exception as e:
+                logger.error(f"Error summarizing transcript: {str(e)}")
+                logger.error(traceback.format_exc())
+                return f"Error: {str(e)}"
+
+    def summarize_large_text(self, text):
+        """
+        Summarize large text input by chunking and using OpenRouter API
+        """
+        import tiktoken
+        from nltk.tokenize import sent_tokenize
+        import nltk
+        
+        # Ensure NLTK punkt tokenizer is available
+        try:
+            nltk.data.find('tokenizers/punkt')
+        except LookupError:
+            nltk.download('punkt')
+        
+            # Constants for API
+            API_KEYS = [
+                "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",
+                "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"
+            ]
+            MODEL_NAME = "mistralai/mistral-7b-instruct:free"
+            CHUNK_TOKEN_LIMIT = 3500
+            MAX_OUTPUT_TOKENS = 500
+            
+            # Prompt template
+            PROMPT_TEMPLATE = """
+            You are an expert TED Talk summarizer. Read the transcript below and summarize it with the following structure:
+
+            1. **Topic**: What is the main subject or theme of the talk? What is being discussed?
+            2. **Purpose**: What is the speaker trying to accomplish with this talk? What is the speaker's goal in sharing this message?
+            3. **Key Takeaway**: What is the most important point or lesson from the talk that the audience should remember?
+
+            Transcript:
+            """
+            
+            # Helper function to chunk text semantically
+            def semantic_chunk_text(text, tokenizer, max_tokens=CHUNK_TOKEN_LIMIT):
+                sentences = sent_tokenize(text)
+                chunks = []
+                current_chunk = ""
+                current_len = 0
+
+                for sentence in sentences:
+                    sentence_len = len(tokenizer.encode(sentence))
+
+                    if sentence_len > max_tokens:
+                        words = sentence.split()
+                        chunk = ""
+                        for word in words:
+                            if len(tokenizer.encode(chunk + " " + word)) <= max_tokens:
+                                chunk += " " + word
+                            else:
+                                chunks.append(chunk.strip())
+                                chunk = word
+                        if chunk:
+                            chunks.append(chunk.strip())
+                    elif current_len + sentence_len <= max_tokens:
+                        current_chunk += " " + sentence
+                        current_len += sentence_len
+                    else:
+                        chunks.append(current_chunk.strip())
+                        current_chunk = sentence
+                        current_len = sentence_len
+
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+
+                logger.info(f"Total chunks created: {len(chunks)}")
+                return chunks
+            
+            # Call API function
+            def call_openrouter_api(chunk, prompt_template, api_key):
+                url = "https://openrouter.ai/api/v1/chat/completions"
+                prompt = prompt_template + f"""{chunk}"""
+
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+
+                data = {
+                    "model": MODEL_NAME,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": MAX_OUTPUT_TOKENS
+                }
+
+                response = requests.post(url, headers=headers, json=data)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    return result["choices"][0]["message"]["content"]
+                else:
+                    logger.error(f"Error with API request: {response.status_code}")
+                    return None
+            
+            # Select a working API key
+            def get_api_key():
+                for api_key in API_KEYS:
+                    test_summary = call_openrouter_api("Test chunk", PROMPT_TEMPLATE, api_key)
+                    if test_summary:
+                        logger.info(f"Using API key: {api_key[:10]}...")
+                        return api_key
+                raise Exception("All API keys failed!")
+            
+            try:
+                # Initialize tokenizer
+                tokenizer = tiktoken.get_encoding("gpt2")
+                
+                # Get API key
+                api_key = get_api_key()
+                
+                # Split text into chunks
+                text_chunks = semantic_chunk_text(text, tokenizer)
+                
+                # Process each chunk
+                intermediate_summaries = []
+                for chunk in text_chunks:
+                    result = call_openrouter_api(chunk, PROMPT_TEMPLATE, api_key)
+                    if result:
+                        intermediate_summaries.append(result)
+                
+                # Combine intermediate summaries
+                final_input = "\n".join(intermediate_summaries)
+                
+                # Ensure final input isn't too large
+                if len(tokenizer.encode(final_input)) > CHUNK_TOKEN_LIMIT:
+                    logger.info("Final summary input too large. Chunking final input...")
+                    final_input_chunks = semantic_chunk_text(final_input, tokenizer)
+                    final_summary_parts = []
+                    for final_chunk in final_input_chunks:
+                        final_summary_parts.append(call_openrouter_api(final_chunk, PROMPT_TEMPLATE, api_key))
+                    final_summary = "\n".join(final_summary_parts)
+                else:
+                    final_summary = call_openrouter_api(final_input, PROMPT_TEMPLATE, api_key)
+                
+                return final_summary
+            
+            except Exception as e:
+                logger.error(f"Error in summarize_large_text: {str(e)}")
+                logger.error(traceback.format_exc())
+                return f"Error generating summary: {str(e)}"
+            
+    def check_transcript_availability(self, video_id=None):
+                """Check if transcripts are available in the data"""
+                if 'all_commentss' not in self.data.columns:
+                    return {"status": "error", "message": "No transcript column in data"}
+                
+                transcript_availability = {
+                    "total_videos": len(self.data),
+                    "videos_with_transcripts": self.data['all_comments'].notna().sum()
+                }
+                
+                if video_id:
+                    video_data = self.data[self.data['video_id'] == video_id]
+                    if video_data.empty:
+                        return {"status": "error", "message": f"Video ID {video_id} not found"}
+                    
+                    has_transcript = video_data.iloc[0].get('all_comments') is not None and not pd.isna(video_data.iloc[0].get('transcript'))
+                    transcript_availability["video_id"] = video_id
+                    transcript_availability["has_transcript"] = has_transcript
+                
+                return transcript_availability
+    
+        
+        # except Exception as e:
+        #     logger.error(f"Error in summarize_large_text: {str(e)}")
+        #     logger.error(traceback.format_exc())
+        #     return f"Error generating summary: {str(e)}"

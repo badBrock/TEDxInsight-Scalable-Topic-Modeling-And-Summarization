@@ -1,0 +1,1 @@
+well so listen here i used this google api for getting comments from videos but what i got was max of 20 comment per video which is due to the the rate limit of google api , so in folder ---> getting_all_comments ---> i have scraped the comments againg but used a lib which bypasses the api limit so you do not need any api i guess.

@@ -1,3 +1,7 @@
 # Ignore large CSVs
 merge_comments/video_comments.csv
 merge_comments/video_comments_joined.csv
+data
+scraping\scraped_links.json
+merge_comments\merged_video_ids.pkl
+scraping\random_processes\scraped_links_2025.pkl

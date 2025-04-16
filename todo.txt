@@ -1,0 +1,4 @@
+1. gotta ignore the data folder entirely but have to keep the merging file , where i merge old and new video title--->
+2. merge_comments\merged_video_ids.pkl this needs to get removed from the repo along with add this to gitignore too
+3. remove scraping\scraped_links.json as it stored all the links
+3. remove scraping\random_processes\scraped_links_2025.pkl as it stored all the links

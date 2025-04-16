@@ -432,9 +432,19 @@
                     https://www.youtube.com/watch?v=[video_id]
                   </div>
                 </div>
-                <button type="submit" class="btn btn-primary">
-                  <i class="fas fa-analytics me-2"></i>Analyze Comments
-                </button>
+                <div class="d-flex">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-analytics me-2"></i>Analyze Comments
+                  </button>
+                  <button
+                    type="button"
+                    id="summarizeTranscriptBtn"
+                    class="btn btn-outline-secondary ms-2"
+                    disabled
+                  >
+                    <i class="fas fa-file-alt me-2"></i>Summarize Transcript
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -452,6 +462,34 @@
         <p class="mt-3 fw-bold">
           Analyzing comments, this may take a few minutes...
         </p>
+      </div>
+
+      <!-- Transcript Summary Section -->
+      <div
+        class="row justify-content-center"
+        id="transcriptSummarySection"
+        style="display: none"
+      >
+        <div class="col-md-10">
+          <div class="card input-card animate-fade-in">
+            <div class="card-header">
+              <i class="fas fa-file-alt me-2"></i>Talk Summary
+            </div>
+            <div class="card-body">
+              <div id="loadingSummary" style="display: none">
+                <div class="d-flex justify-content-center">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+                <p class="text-center mt-2">
+                  Generating summary, this may take a minute...
+                </p>
+              </div>
+              <div id="transcriptSummary"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Video Player (Initially Hidden) - CENTERED YOUTUBE PLAYER -->
@@ -576,8 +614,23 @@
         const videoTitle = document.getElementById("videoTitle");
         const videoSpeaker = document.getElementById("videoSpeaker");
         const videoDate = document.getElementById("videoDate");
+        const summarizeTranscriptBtn = document.getElementById(
+          "summarizeTranscriptBtn"
+        );
+        const transcriptSummarySection = document.getElementById(
+          "transcriptSummarySection"
+        );
+        const loadingSummary = document.getElementById("loadingSummary");
+        const transcriptSummary = document.getElementById("transcriptSummary");
 
         let currentTopicId = null;
+
+        // Enable the summarize button after a video ID is entered
+        document
+          .getElementById("videoId")
+          .addEventListener("input", function (e) {
+            summarizeTranscriptBtn.disabled = !e.target.value.trim();
+          });
 
         // Handle form submission
         analyzeForm.addEventListener("submit", function (e) {
@@ -593,6 +646,7 @@
           loading.style.display = "block";
           resultsSection.style.display = "none";
           videoPlayerSection.style.display = "none";
+          transcriptSummarySection.style.display = "none";
           topicsList.innerHTML = "";
           commentsList.innerHTML = "";
           topicTitle.innerHTML =
@@ -600,6 +654,9 @@
           commentsHeader.textContent = "Select a topic to view comments";
           topicSummary.style.display = "none";
           commentCount.style.display = "none";
+
+          // Enable the summarize transcript button
+          summarizeTranscriptBtn.disabled = false;
 
           // Setup video player (using YouTube instead of TED embed)
           setupVideoPlayer(videoId);
@@ -655,6 +712,52 @@
             .catch((error) => {
               loading.style.display = "none";
               alert("Error analyzing comments: " + error);
+            });
+        });
+
+        // Handle transcript summarization
+        summarizeTranscriptBtn.addEventListener("click", function () {
+        const videoId = document.getElementById("videoId").value.trim();
+        if (!videoId) {
+            alert("Please enter a valid video ID");
+            return;
+        }
+        // Show loading, hide results
+        loadingSummary.style.display = "block";
+        transcriptSummary.innerHTML = "";
+        transcriptSummarySection.style.display = "block";
+
+        // Add this in the fetch promise chain for summarizing transcript
+        fetch(`/summarize_transcript/${videoId}`)
+            .then(response => {
+                console.log("Response status:", response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log("Summary data:", data);
+                loadingSummary.style.display = "none";
+                
+                if (data.error) {
+                    console.error("Error from backend:", data.error);
+                    transcriptSummary.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    return;
+                }
+                
+                // Format and display the summary
+                const summary = data.summary;
+                const formattedSummary = summary.replace(
+                /\*\*(.*?)\*\*/g,
+                "<strong>$1</strong>"
+                );
+                transcriptSummary.innerHTML = `
+                            <div class="mb-4 p-3 border-start border-4 border-primary bg-light">
+                                ${formattedSummary}
+                            </div>
+                        `;
+            })
+            .catch((error) => {
+            loadingSummary.style.display = "none";
+            transcriptSummary.innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`;
             });
         });
 
